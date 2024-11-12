@@ -12,6 +12,8 @@ const client = new Client({
 
 app.use(express.json());
 
+let isClientReady = false;  // Tambahkan variabel untuk cek apakah klien siap
+
 // Fungsi untuk mengirim pesan ke grup
 async function sendMessageToGroup(groupName, message) {
     const chats = await client.getChats();
@@ -25,8 +27,12 @@ async function sendMessageToGroup(groupName, message) {
     }
 }
 
-// Endpoint untuk menerima data POST dari ESP32
+// Endpoint untuk menerima data dari ESP32
 app.get('/send-message', (req, res) => {
+    if (!isClientReady) {
+        return res.status(503).send('WhatsApp Client belum siap, silakan coba lagi nanti.');
+    }
+
     const { groupName, message } = req.query;
 
     // Cek apakah groupName dan message ada
@@ -34,7 +40,7 @@ app.get('/send-message', (req, res) => {
         return res.status(400).send('Parameter groupName dan message harus ada');
     }
 
-    console.log(`Group Name: ${groupName}, Message: ${message}`);  // Cek apakah parameter diterima
+    console.log(`Group Name: ${groupName}, Message: ${message}`);
 
     sendMessageToGroup(groupName, message)
         .then(() => res.send('Pesan berhasil dikirim'))
@@ -57,4 +63,15 @@ client.on('qr', (qr) => {
 
 client.on('ready', () => {
     console.log('WhatsApp Web siap digunakan!');
+    isClientReady = true;
+});
+
+client.on('auth_failure', (message) => {
+    console.error('Gagal otentikasi:', message);
+    isClientReady = false;
+});
+
+client.on('disconnected', (reason) => {
+    console.log('Klien WhatsApp terputus:', reason);
+    isClientReady = false;
 });
